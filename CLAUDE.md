@@ -33,4 +33,6 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
 - `expected_output_2026-10-11.xlsx`: what the finished Excel should look like.
 
 ## Conventions
+- On every release bump the `?v=` number in `index.html` (for app.js) and at the top of `app.js` (for core.js).
+  GitHub Pages lets browsers cache files for 10 minutes; without the bump the doctor can run stale code.
 - Commits are under the user's name only: no Claude co-author trailer.

@@ -1,4 +1,5 @@
-import * as core from "./core.js";
+// Bump ?v= here and in index.html on every release so browsers never run a cached old copy.
+import * as core from "./core.js?v=2";
 
 // The Cloudflare Worker that holds the Gemini key. When the page is served from localhost
 // (development only) it can be pointed elsewhere with ?relay=http://127.0.0.1:8787
