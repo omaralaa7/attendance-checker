@@ -2,11 +2,12 @@
 // Settings → Variables and Secrets:
 //   GEMINI_API_KEY   (Secret)  your Google AI Studio key
 //   ALLOWED_ORIGINS  (Text)    comma-separated site addresses, e.g. https://yourname.github.io
-//   GEMINI_MODEL     (Text, optional)  defaults to gemini-3.8-flash
-//   GEMINI_FALLBACK_MODEL (Text, optional)  used when the main model is overloaded
+//   GEMINI_MODELS    (Text, optional)  comma-separated models to try in order; defaults to MODELS below
 
-const DEFAULT_MODEL = "gemini-3.8-flash";
-const FALLBACK_MODEL = "gemini-3.6-flash";
+// Tried in order. Free-tier models are often overloaded (503), so we fall through to the next one.
+// All of these scored 98-100% on the sample sheets; the "lite" models scored ~94% and are left out.
+const MODELS = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-3.6-flash", "gemini-3.7-flash"];
+const ROUNDS = 3, ROUND_PAUSE_MS = 8000;
 const MAX_IMAGES = 6;
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -40,29 +41,31 @@ export default {
     const parts = images.map(img => ({ inline_data: { mime_type: "image/jpeg", data: String(img) } }));
     parts.push({ text: body.prompt });
 
-    // Free-tier models are often overloaded (503): alternate between the main and fallback model.
-    const models = [env.GEMINI_MODEL || DEFAULT_MODEL, env.GEMINI_FALLBACK_MODEL || FALLBACK_MODEL];
-    const attempts = [models[0], models[1], models[0], models[1]];
+    const models = (env.GEMINI_MODELS || "").split(",").map(m => m.trim()).filter(Boolean);
+    const chain = models.length ? models : MODELS;
     const payload = JSON.stringify({
       contents: [{ role: "user", parts }],
       generationConfig: { responseMimeType: "application/json", temperature: 0 },
     });
-    let r, j = {}, used = "";
-    for (const [i, model] of attempts.entries()) {
-      if (i >= 2) await new Promise(res => setTimeout(res, 3000));
-      try {
-        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-          body: payload,
-        });
-      } catch {
-        r = null;
-        continue;
+    let r = null, j = {}, used = "";
+    outer: for (let round = 0; round < ROUNDS; round++) {
+      if (round) await new Promise(res => setTimeout(res, ROUND_PAUSE_MS));
+      for (const model of chain) {
+        let resp;
+        try {
+          resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+            body: payload,
+          });
+        } catch {
+          continue;
+        }
+        r = resp; used = model;
+        j = await resp.json().catch(() => ({}));
+        // 404: model retired; 5xx/429: busy or per-model quota -> try the next model
+        if (resp.ok || !(resp.status >= 500 || resp.status === 429 || resp.status === 404)) break outer;
       }
-      used = model;
-      j = await r.json().catch(() => ({}));
-      if (r.ok || !(r.status >= 500 || r.status === 429)) break;
     }
     if (!r) return reply(502, { error: "upstream_unreachable" });
     if (!r.ok) {

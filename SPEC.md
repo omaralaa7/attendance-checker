@@ -30,6 +30,8 @@ only the images + roster names leave the browser (to Gemini, via the relay).
 ## Reading the handwriting
 - In the browser: apply EXIF orientation, resize so the long side is at most 1568 px, JPEG ~0.9. Whole photos are sent
   (splitting into halves was tested and was slower and slightly less accurate with Gemini).
+- Free models are often busy: the Worker falls through a chain of models; if all are busy the page waits 30 s and
+  retries (up to 3 attempts), showing a countdown, so the doctor never has to press again.
 - One request with all photos plus the roster as `serial|full name` lines, sent to the Cloudflare Worker, which forwards it to Gemini
   with JSON output. The prompt (Arabic, in `core.js`) keeps these rules: names on paper are shorter, spelling varies
   (ه/ة, ى/ي, أ/ا, عبد الله/عبدالله), a match must start with the first name and the father's name,

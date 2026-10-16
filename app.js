@@ -6,7 +6,8 @@ const PROD_RELAY = "https://attendance-relay.omaralaa20042004.workers.dev";
 const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const RELAY = (isLocal && new URLSearchParams(location.search).get("relay")) || PROD_RELAY;
 
-const MAX_SIDE = 1568, MAX_PHOTOS = 6, TIMEOUT_MS = 180000;
+const MAX_SIDE = 1568, MAX_PHOTOS = 6, TIMEOUT_MS = 480000;
+const BUSY_RETRIES = 2, BUSY_WAIT_S = 30;
 const WB_KEY = "ghiab_wb", WB_PREV_KEY = "ghiab_wb_prev";
 
 const $ = id => document.getElementById(id);
@@ -120,7 +121,7 @@ async function prepare(file) {
 
 const RELAY_ERRORS = {
   quota: "الحد المجاني لقراءة الصور خلص النهارده. جرب تاني بعد شوية أو بكرة.",
-  busy: "خدمة القراءة عليها ضغط دلوقتي. استنى دقيقة ودوس \"اقرأ الأسماء\" تاني.",
+  busy: "خدمة القراءة عليها ضغط كبير دلوقتي. جرب تاني بعد ربع ساعة كده — الصور والتاريخ هيفضلوا زي ما هم.",
   upstream_unreachable: "خدمة القراءة مش بترد دلوقتي. جرب تاني بعد شوية.",
   missing_key: "خدمة القراءة لسه مش متظبطة (المفتاح ناقص). كلّم اللي عمل البرنامج.",
   forbidden_origin: "خدمة القراءة مش قابلة الطلب من الموقع ده. كلّم اللي عمل البرنامج.",
@@ -138,8 +139,32 @@ async function askRelay(images, prompt, signal) {
     throw new Error("مفيش اتصال بالإنترنت أو خدمة القراءة مش بترد. اتأكد من النت وجرب تاني.");
   }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.text) throw new Error(RELAY_ERRORS[j.error] || `حصلت مشكلة في خدمة القراءة (${r.status}). جرب تاني بعد شوية.`);
+  if (!r.ok || !j.text) {
+    const e = new Error(RELAY_ERRORS[j.error] || `حصلت مشكلة في خدمة القراءة (${r.status}). جرب تاني بعد شوية.`);
+    e.code = j.error;
+    throw e;
+  }
   return j.text;
+}
+
+const sleep = (ms, signal) => new Promise((res, rej) => {
+  const t = setTimeout(res, ms);
+  signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("aborted", "AbortError")); }, { once: true });
+});
+
+// The free models are often busy: wait and try again a couple of times before giving up.
+async function askRelayPatiently(images, prompt, signal) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await askRelay(images, prompt, signal); }
+    catch (e) {
+      if (e.code !== "busy" || attempt >= BUSY_RETRIES) throw e;
+      for (let s = BUSY_WAIT_S; s > 0; s--) {
+        setStatus(`خدمة القراءة عليها ضغط. هيحاول تاني لوحده بعد ${s} ثانية… (محاولة ${attempt + 2} من ${BUSY_RETRIES + 1})`);
+        await sleep(1000, signal);
+      }
+      setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد دقيقة.");
+    }
+  }
 }
 
 $("read").onclick = async () => {
@@ -159,7 +184,7 @@ $("read").onclick = async () => {
     setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد دقيقة.");
     let res;
     for (let attempt = 0; ; attempt++) {
-      const text = await askRelay(images, prompt, ctl.signal);
+      const text = await askRelayPatiently(images, prompt, ctl.signal);
       try { res = core.applyResult(core.extractJson(text), roster.students); break; }
       catch (e) { if (!(e instanceof SyntaxError) || attempt) throw new Error("الرد مكانش مفهوم. جرب تاني أو صوّر الورقة أوضح."); }
     }

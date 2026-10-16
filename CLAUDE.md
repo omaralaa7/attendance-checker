@@ -13,7 +13,9 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
   - The working workbook is kept in the doctor's browser (localStorage `ghiab_wb`, previous copy in `ghiab_wb_prev`).
 - **Cloudflare Worker relay** (`worker/worker.js`, deployed as `attendance-relay.omaralaa20042004.workers.dev`).
   Holds `GEMINI_API_KEY` as a secret and only accepts requests from `ALLOWED_ORIGINS` (plus localhost).
-  It calls the **free Gemini API**: `gemini-3.8-flash`, alternating with `gemini-3.6-flash` when overloaded (503).
+  It calls the **free Gemini API**, trying `gemini-3.8-flash` → `gemini-3-flash-preview` → `gemini-3.6-flash` → `gemini-3.7-flash`
+  for up to 3 rounds when they are overloaded (503); the page then retries twice more after 30 s. Lite models were
+  measured at ~94% and mark erased names present, so they are deliberately excluded.
 - Constraints: zero running cost, and the doctor is non-technical (no keys or setup on her side).
   The repo is **public**, so never commit `samples/`, `.env`, or any roster or student data.
 
