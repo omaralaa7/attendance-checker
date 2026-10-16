@@ -1,0 +1,1 @@
+Read CLAUDE.md and SPEC.md in this folder and build the attendance app exactly as described. Use the files in samples/ to test it. When the offline tests pass, ask me for my Anthropic API key to run the live test, then create the private GitHub repo and push it. Talk to me in Egyptian Arabic.
