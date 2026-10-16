@@ -152,3 +152,27 @@ test("prompt rules: readable means present, three names are enough", () => {
   assert.match(p, /حتى لو الخط باهت/);
   assert.doesNotMatch(p, /متشطب أو ممسوح/);
 });
+
+test("layout is fitted so text isn't clipped, and stays stable on re-save", sample, async () => {
+  const before = (await open(new URL("roster.xlsx", S))).worksheets[0];
+  let wb = await open(new URL("roster.xlsx", S));
+  const { marks, doubts } = expectedMarks();
+  core.writeColumn(wb.worksheets[0], "2026-10-11", marks, doubts);
+  wb = await roundTrip(wb);
+  const ws = wb.worksheets[0];
+  const width = c => ws.getColumn(c).width, height = r => ws.getRow(r).height;
+  assert.ok(width(1) >= 8, "serial column fits");
+  assert.ok(width(4) >= 28, "program column fits 'هندسة الاتصالات والالكترونيات'");
+  assert.ok(width(3) >= before.getColumn(3).width, "name column never shrinks");
+  assert.ok(height(8) >= 19 && height(105) >= 19, "student rows fit a 13pt line");
+  assert.ok(height(5) > 50, "lecturer title wraps onto several lines");
+  for (let r = 1; r <= 105; r++)
+    for (let c = 1; c <= 4; c++)
+      assert.deepEqual(ws.getCell(r, c).value, before.getCell(r, c).value, `cell ${r},${c}`);
+
+  const snapshot = () => JSON.stringify([[1, 2, 3, 4, 5].map(width), [1, 2, 3, 5, 6, 7, 8, 105].map(height)]);
+  const first = snapshot();
+  core.writeColumn(ws, "2026-10-18", marks, doubts);
+  const again = (await roundTrip(wb)).worksheets[0];
+  assert.equal(JSON.stringify([[1, 2, 3, 4, 5].map(c => again.getColumn(c).width), [1, 2, 3, 5, 6, 7, 8, 105].map(r => again.getRow(r).height)]), first);
+});

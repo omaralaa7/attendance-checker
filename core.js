@@ -120,7 +120,72 @@ export function writeColumn(ws, iso, marks, doubts = {}) {
       alignment: { horizontal: "center", vertical: "middle" },
     };
   }
+  fitLayout(ws, roster);
   return col;
+}
+
+// Rough text width in Excel column units (one unit ≈ one "0" of the 11pt default font):
+// spaces are about half a digit wide and joined Arabic letters about 0.8 of a digit.
+const textUnits = (text, size) => {
+  let w = 0;
+  for (const ch of String(text)) w += /\s/.test(ch) ? 0.5 : /[؀-ۿ]/.test(ch) ? 0.8 : 1;
+  return w * (size / 11) + 2.5;
+};
+const MIN_COL_WIDTH = 8;
+const colLetterToNum = s => [...s].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+
+/**
+ * The faculty export has fixed short rows and wrapped text in narrow columns, so names, programs and
+ * the title block show up clipped. Widen the roster columns to fit their longest text and make rows tall
+ * enough. Only widths and heights grow; cell contents are never changed.
+ */
+export function fitLayout(ws, roster) {
+  const dateCols = new Set(Object.values(parseRoster(ws).dateCols));
+  const rows = [roster.headerRow, ...roster.students.map(s => s.row)];
+
+  // 1) table columns: fit the longest value on one line
+  ws.getRow(roster.headerRow).eachCell((h, ci) => {
+    if (dateCols.has(ci)) return;
+    let need = MIN_COL_WIDTH;
+    for (const r of rows) {
+      const c = ws.getRow(r).getCell(ci), t = clean(c.value);
+      if (t) need = Math.max(need, textUnits(c.value?.richText ? t : String(c.value ?? ""), c.font?.size || 11));
+    }
+    const column = ws.getColumn(ci);
+    if (need > (column.width || 9)) column.width = Math.min(70, Math.ceil(need));
+  });
+
+  // 2) table rows: one line of the largest font
+  for (const r of rows) {
+    const row = ws.getRow(r);
+    let size = 11;
+    row.eachCell(c => { size = Math.max(size, c.font?.size || 11); });
+    const need = Math.ceil(size * 1.45);
+    if (!row.height || row.height < need) row.height = need;
+  }
+
+  // 3) title block: tall enough for the wrapped lines of each cell (merged cells use the merged width)
+  const merges = (ws.model.merges || []).map(m => {
+    const [a, b = a] = m.split(":");
+    const p = x => ({ c: colLetterToNum(x.match(/[A-Z]+/)[0]), r: +x.match(/\d+/)[0] });
+    return { from: p(a), to: p(b) };
+  });
+  for (let r = 1; r < roster.headerRow; r++) {
+    const row = ws.getRow(r);
+    let need = 0;
+    row.eachCell((c, ci) => {
+      const t = String(c.value?.richText ? clean(c.value) : c.value ?? "");
+      if (!clean(t)) return;
+      const m = merges.find(m => m.from.r === r && m.from.c === ci);
+      if (m && m.to.r !== m.from.r) return; // vertical merge spans several rows; leave it
+      let width = 0;
+      for (let k = ci; k <= (m ? m.to.c : ci); k++) width += ws.getColumn(k).width || 9;
+      const size = c.font?.size || 11;
+      const lines = c.alignment?.wrapText ? Math.max(1, Math.ceil(textUnits(t, size) / width)) : 1;
+      need = Math.max(need, Math.ceil(lines * size * 1.4 + 2));
+    });
+    if (need && (!row.height || row.height < need)) row.height = need;
+  }
 }
 
 // ---------- reading the sheets ----------
