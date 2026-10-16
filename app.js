@@ -162,7 +162,7 @@ async function askRelayPatiently(images, prompt, signal) {
         setStatus(`خدمة القراءة عليها ضغط. هيحاول تاني لوحده بعد ${s} ثانية… (محاولة ${attempt + 2} من ${BUSY_RETRIES + 1})`);
         await sleep(1000, signal);
       }
-      setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد دقيقة.");
+      setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد من دقيقة لـ 3 دقايق، سيب الصفحة مفتوحة.");
     }
   }
 }
@@ -181,7 +181,7 @@ $("read").onclick = async () => {
     const images = [];
     for (const p of photos) images.push(await prepare(p.f));
     const prompt = core.buildPrompt(roster.students, photos.length);
-    setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد دقيقة.");
+    setStatus("بيقرأ الأسماء من الصور ويطابقها مع الكشف… ده ممكن ياخد من دقيقة لـ 3 دقايق، سيب الصفحة مفتوحة.");
     let res;
     for (let attempt = 0; ; attempt++) {
       const text = await askRelayPatiently(images, prompt, ctl.signal);
