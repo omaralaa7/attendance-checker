@@ -3,8 +3,10 @@
 //   GEMINI_API_KEY   (Secret)  your Google AI Studio key
 //   ALLOWED_ORIGINS  (Text)    comma-separated site addresses, e.g. https://yourname.github.io
 //   GEMINI_MODEL     (Text, optional)  defaults to gemini-3.8-flash
+//   GEMINI_FALLBACK_MODEL (Text, optional)  used when the main model is overloaded
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
+const FALLBACK_MODEL = "gemini-3.6-flash";
 const MAX_IMAGES = 6;
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -38,28 +40,38 @@ export default {
     const parts = images.map(img => ({ inline_data: { mime_type: "image/jpeg", data: String(img) } }));
     parts.push({ text: body.prompt });
 
-    const model = env.GEMINI_MODEL || DEFAULT_MODEL;
-    let r;
-    try {
-      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0 },
-        }),
-      });
-    } catch {
-      return reply(502, { error: "upstream_unreachable" });
+    // Free-tier models are often overloaded (503): alternate between the main and fallback model.
+    const models = [env.GEMINI_MODEL || DEFAULT_MODEL, env.GEMINI_FALLBACK_MODEL || FALLBACK_MODEL];
+    const attempts = [models[0], models[1], models[0], models[1]];
+    const payload = JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0 },
+    });
+    let r, j = {}, used = "";
+    for (const [i, model] of attempts.entries()) {
+      if (i >= 2) await new Promise(res => setTimeout(res, 3000));
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: payload,
+        });
+      } catch {
+        r = null;
+        continue;
+      }
+      used = model;
+      j = await r.json().catch(() => ({}));
+      if (r.ok || !(r.status >= 500 || r.status === 429)) break;
     }
-    const j = await r.json().catch(() => ({}));
+    if (!r) return reply(502, { error: "upstream_unreachable" });
     if (!r.ok) {
-      const code = r.status === 429 ? "quota" : (r.status === 400 || r.status === 403) ? "key_or_request" : "upstream";
+      const code = r.status === 429 ? "quota" : r.status >= 500 ? "busy" : (r.status === 400 || r.status === 403) ? "key_or_request" : "upstream";
       return reply(r.status === 429 ? 429 : 502, { error: code, detail: j?.error?.message || "" });
     }
     const cand = j.candidates?.[0];
     const text = (cand?.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("");
     if (!text) return reply(502, { error: "empty", detail: cand?.finishReason || "" });
-    return reply(200, { text });
+    return reply(200, { text, model: used });
   },
 };

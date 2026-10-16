@@ -1,8 +1,8 @@
 samples/
-data/*
+data/
 .env
 .venv/
+node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
-!data/.gitkeep

@@ -1,87 +1,38 @@
-# دفتر الغياب
+# دفتر الغياب — Attendance Checker
 
-برنامج صغير بيشتغل على جهازك، بيقرأ ورق الحضور اللي الطلبة كتبوا فيه أساميهم بخط إيدهم، ويعلّم في ملف الإكسل الرسمي بتاع الكشف:
-**✓ للحاضر** و **✗ للغايب**، في عمود جديد عنوانه تاريخ المحاضرة.
+Live: **https://omaralaa7.github.io/attendance-checker/**
 
-## بيعمل إيه بالظبط
-1. بتختار تاريخ المحاضرة وترفع صورة أو أكتر لورق الحضور (مثلاً ورقة لكل شعبة).
-2. البرنامج بيبعت الصور وأسامي الكشف لـ Claude (من Anthropic) يقرأ الخط ويطابق كل اسم مكتوب مع اسم في الكشف.
-3. بيظهرلك الكشف كله: كل طالب جنبه ✓ أو ✗. تقدر تدوس على أي علامة تغيّرها.
-   - **السطور الصفرا** = اسم باهت أو متشطب أو مش واضح، اتعلّم غايب لحد ما تراجعه بنفسك.
-   - لو في أسماء مكتوبة في الورق ومش لاقيها في الكشف، هتظهر في مربع أصفر فوق.
-4. تدوس **حفظ ملف الإكسل**: العمود بيتكتب في الملف وينزل عندك نسخة باسم `الغياب 11-10-2026.xlsx` مثلاً.
-   - لو اخترت تاريخ متسجل قبل كده، علاماته بتظهر وتقدر تعدلها، والحفظ بيكتب على نفس العمود مش بيعمل عمود جديد.
-   - قبل كل حفظ بيتعمل نسخة احتياطي في `data/backups/`.
+Upload photos of a lecture's handwritten Arabic sign-in sheets, pick the date, and the app marks the course
+roster Excel: ✓ present, ✗ absent, in a new column headed with the date. Unclear or faded names are highlighted
+yellow for review, and every mark can be toggled before saving.
 
-كل حاجة شغالة على جهازك. الحاجة الوحيدة اللي بتخرج على النت هي الصور وأسامي الطلبة، رايحين لـ Anthropic علشان القراءة.
+## How it works
+- `index.html` + `app.js` + `core.js`: a static page (GitHub Pages). Excel is read and written in the browser with
+  [ExcelJS](https://github.com/exceljs/exceljs), and the workbook is kept in the browser's localStorage.
+- `worker/worker.js`: a Cloudflare Worker that holds the Gemini API key and forwards the photos and roster names to
+  the free Gemini API. The key never appears in the page.
 
-## محتاج إيه
-- **Python 3.10 أو أحدث** — نزّله من [python.org](https://www.python.org/downloads/). على ويندوز علّم على **"Add Python to PATH"** وانت بتسطّبه.
-- **مفتاح Anthropic API** (الخطوة الجاية).
+## Setup
+1. **Gemini key**: [aistudio.google.com](https://aistudio.google.com) → Get API key (free tier).
+2. **Worker**: Cloudflare → Workers & Pages → Create → Hello World → paste `worker/worker.js` → Deploy.
+   Under Settings → Variables and Secrets add:
+   - `GEMINI_API_KEY` (Secret)
+   - `ALLOWED_ORIGINS` (Text): `https://omaralaa7.github.io`
+3. **Page**: set `PROD_RELAY` in `app.js` to the Worker URL, then enable GitHub Pages
+   (Settings → Pages → Deploy from branch → `main` / root).
 
-## إزاي تجيب مفتاح API
-1. ادخل [console.anthropic.com](https://console.anthropic.com) واعمل حساب.
-2. من **Billing** اشحن رصيد (بفيزا).
-3. من **API Keys** دوس **Create Key**، وانسخ المفتاح (بيبدأ بـ `sk-ant-`). هيظهرلك مرة واحدة بس، فاحفظه.
-
-> ⚠️ **المفتاح بيصرف فلوس مع كل استخدام.** كل مرة تدوس "اقرأ الأسماء" بتتحسب عليك حسب عدد الصور وطول الكشف
-> (في حدود سنتات قليلة للمحاضرة الواحدة). متدّيش المفتاح لحد، ولو حسيت إنه اتسرب امسحه من الموقع واعمل واحد جديد.
-
-## تحط المفتاح فين
-في فولدر البرنامج اعمل ملف اسمه `.env` (أو أول تشغيل هيعمله لوحده من `.env.example`)، وافتحه بالـ Notepad واكتب فيه:
-
-```
-ANTHROPIC_API_KEY=sk-ant-المفتاح-بتاعك
-CLAUDE_MODEL=claude-opus-5-5
-```
-
-احفظ الملف وشغّل البرنامج تاني. الملف ده مش بيترفع على GitHub.
-
-## تشغيل البرنامج
-
-### ويندوز
-دبل كليك على **`start.bat`**.
-أول مرة هياخد دقيقة يسطّب الحاجات اللي محتاجها، وبعدين المتصفح هيفتح لوحده على `http://127.0.0.1:8000`.
-سيب الشباك الأسود مفتوح طول ما انت شغال، ولما تخلص اقفله.
-
-### ماك (أو لينكس)
-افتح Terminal جوه فولدر البرنامج واكتب:
-
+## Development
 ```bash
-./start.sh
+npm install
+npm test
 ```
-
-### لو عايز تشغّله بنفسك
+To run it locally, create `.env` with `GEMINI_API_KEY=...`, then:
 ```bash
-python run.py
+node worker/dev-server.mjs
 ```
-(بعد ما تكون مسطّب الحاجات بـ `pip install -r requirements.txt`).
+```bash
+python -m http.server 8000
+```
+Then open `http://localhost:8000/?relay=http://127.0.0.1:8787`.
 
-## الاستخدام خطوة بخطوة
-1. **أول مرة بس:** في جزء "ملف الطلبة" ارفع كشف الطلبة (ملف الإكسل من نظام ابن الهيثم، أو أي ملف فيه عمود "اسم الطالب").
-   الملف ده بيتحفظ في `data/current.xlsx` وكل المحاضرات بتتضاف عليه.
-2. اختار **تاريخ المحاضرة** (بيبدأ بتاريخ النهارده).
-3. ارفع **صور ورق الحضور** — اضغط على المربع أو اسحب الصور فيه. صوّر الورقة كلها، مفرودة، في نور كويس.
-4. دوس **اقرأ الأسماء وعلّم الغياب** واستنى دقيقة أو اتنين. لو عايز توقفه دوس **إلغاء**.
-5. **راجع**: بص على السطور الصفرا، واستخدم الفلاتر (الكل / حاضر / غايب / للمراجعة). دوس على أي علامة تغيّرها.
-6. دوس **حفظ ملف الإكسل**. الملف بينزل عندك وكمان بيفضل محفوظ في البرنامج للمحاضرة الجاية.
-
-عايز تغيّر الكشف (ترم جديد مثلاً)؟ افتح "تغيير ملف الإكسل" وارفع الملف الجديد. القديم بيتحفظ نسخة في `data/backups/`.
-
-## لو حصلت مشكلة
-| الرسالة | الحل |
-|---|---|
-| مفيش مفتاح API | حط المفتاح في `.env` زي ما فوق، وقفل البرنامج وافتحه تاني. |
-| مفتاح الـ API غلط | انسخ المفتاح تاني من الموقع، من غير مسافات. |
-| الرصيد خلص | اشحن من console.anthropic.com ← Billing. |
-| مفيش اتصال بالإنترنت | اتأكد من النت وجرب تاني. |
-| الرد مكانش مفهوم | صوّر الورقة أوضح وجرب تاني. |
-| مش لاقي عمود "اسم الطالب" | الملف اللي رفعته مش كشف طلبة. |
-
-## للمطورين
-- Python + FastAPI + openpyxl + Anthropic SDK. الواجهة صفحة HTML واحدة في `app/static/index.html`.
-- الاختبارات: `python -m pytest` (من غير نت). الاختبار الحي بيشتغل لوحده لو `ANTHROPIC_API_KEY` موجود:
-  `python -m pytest -m live -s`.
-- الموديل: `CLAUDE_MODEL` في `.env` (الافتراضي `claude-opus-5-5`). الطلب بيستخدم `fallbacks: "default"`
-  علشان لو الموديل رفض الطلب لأي سبب، Anthropic تعيده على موديل تاني تلقائياً.
-- فولدر `samples/` فيه بيانات طلبة حقيقيين ومتجاهَل في git — **متغيرش ده ومترفعوش**.
+`samples/` (real student data) is gitignored. Never commit it.
