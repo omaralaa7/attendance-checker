@@ -145,3 +145,10 @@ test("prompt contains the roster", () => {
   assert.match(p, /3\|طالب 3/);
   assert.match(p, /2 ورقة/);
 });
+
+test("prompt rules: readable means present, three names are enough", () => {
+  const p = core.buildPrompt(STUDENTS, 1);
+  assert.match(p, /3 أسماء/);
+  assert.match(p, /حتى لو الخط باهت/);
+  assert.doesNotMatch(p, /متشطب أو ممسوح/);
+});

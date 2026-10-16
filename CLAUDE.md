@@ -13,7 +13,7 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
   - The working workbook is kept in the doctor's browser (localStorage `ghiab_wb`, previous copy in `ghiab_wb_prev`).
 - **Cloudflare Worker relay** (`worker/worker.js`, deployed as `attendance-relay.omaralaa20042004.workers.dev`).
   Holds `GEMINI_API_KEY` as a secret and only accepts requests from `ALLOWED_ORIGINS` (plus localhost).
-  It calls the **free Gemini API**, trying `gemini-3.8-flash` → `gemini-3-flash-preview` → `gemini-3.6-flash` → `gemini-3.7-flash`
+  It calls the **free Gemini API** with low thinking, trying `gemini-3-flash-preview` → `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.7-flash`
   for up to 3 rounds when they are overloaded (503); the page then retries twice more after 30 s. Lite models were
   measured at ~94% and mark erased names present, so they are deliberately excluded.
 - Constraints: zero running cost, and the doctor is non-technical (no keys or setup on her side).
@@ -28,7 +28,8 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
 - `roster.xlsx`: faculty export, 98 students, header row 7 (`م | كود الطالب | اسم الطالب | برنامج الطالب`),
   cells padded with U+00A0, title block with merges in rows 1–6.
 - `sheet_power_2026-10-11.jpg`, `sheet_communications_2026-10-11.jpg`: the handwritten sheets for 11 Oct 2026.
-- `expected_2026-10-11.json`: correct answer: 83 present, 15 absent, serials 30 and 40 faded, so doubtful (yellow).
+- `expected_2026-10-11.json`: 83 clearly present, 15 absent, serials 30 and 40 faded on paper. Rule since 2026-10-16:
+  any name the model can read counts as present, so the correct result is **85 present, 13 absent**.
 - `expected_output_2026-10-11.xlsx`: what the finished Excel should look like.
 
 ## Conventions

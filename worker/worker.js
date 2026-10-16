@@ -6,7 +6,8 @@
 
 // Tried in order. Free-tier models are often overloaded (503), so we fall through to the next one.
 // All of these scored 98-100% on the sample sheets; the "lite" models scored ~94% and are left out.
-const MODELS = ["gemini-3.8-flash", "gemini-3-flash-preview", "gemini-3.6-flash", "gemini-3.7-flash"];
+// gemini-3-flash-preview first: 100% in ~11 s with low thinking, and it has its own capacity.
+const MODELS = ["gemini-3-flash-preview", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.7-flash"];
 const ROUNDS = 3, ROUND_PAUSE_MS = 8000;
 const MAX_IMAGES = 6;
 const MAX_BODY = 20 * 1024 * 1024;
@@ -45,7 +46,11 @@ export default {
     const chain = models.length ? models : MODELS;
     const payload = JSON.stringify({
       contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0 },
+      // Low thinking: at the default level the model spent ~31k tokens deliberating and ran out of output room.
+      generationConfig: {
+        responseMimeType: "application/json", temperature: 0, maxOutputTokens: 32768,
+        thinkingConfig: { thinkingLevel: "low" },
+      },
     });
     let r = null, j = {}, used = "";
     outer: for (let round = 0; round < ROUNDS; round++) {
@@ -63,8 +68,10 @@ export default {
         }
         r = resp; used = model;
         j = await resp.json().catch(() => ({}));
-        // 404: model retired; 5xx/429: busy or per-model quota -> try the next model
-        if (resp.ok || !(resp.status >= 500 || resp.status === 429 || resp.status === 404)) break outer;
+        // 404: model retired; 5xx/429: busy or per-model quota; 400 about thinking: model lacks that setting
+        const thinkingUnsupported = resp.status === 400 && /thinking/i.test(j?.error?.message || "");
+        if (resp.ok && j.candidates?.[0]?.finishReason === "MAX_TOKENS") continue;
+        if (resp.ok || !(resp.status >= 500 || resp.status === 429 || resp.status === 404 || thinkingUnsupported)) break outer;
       }
     }
     if (!r) return reply(502, { error: "upstream_unreachable" });

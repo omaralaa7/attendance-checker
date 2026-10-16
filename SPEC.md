@@ -34,11 +34,12 @@ only the images + roster names leave the browser (to Gemini, via the relay).
   retries (up to 3 attempts), showing a countdown, so the doctor never has to press again.
 - One request with all photos plus the roster as `serial|full name` lines, sent to the Cloudflare Worker, which forwards it to Gemini
   with JSON output. The prompt (Arabic, in `core.js`) keeps these rules: names on paper are shorter, spelling varies
-  (ه/ة, ى/ي, أ/ا, عبد الله/عبدالله), a match must start with the first name and the father's name,
-  and crossed-out, erased or very faded names get doubt=true.
+  (ه/ة, ى/ي, أ/ا, عبد الله/عبدالله), a match must start with the first name and the father's name, and first + father +
+  one more of the student's names is enough. Any readable name is present, even if faded or scribbled over.
+  doubt=true only when the written name could be two different students.
 - JSON: `{"present":[{"serial":n,"written":"…","doubt":false}],"unmatched":["…"]}`. Parse defensively (strip fences,
   take the outermost {…}), drop unknown or duplicate serials, and retry once on invalid JSON.
-- Result: matched and not doubtful → ✓; doubtful → ✗ + yellow + note; everyone else → ✗.
+- Result: matched → ✓; ambiguous (could be two students) → ✗ + yellow + note to review; everyone else → ✗.
 - Show clear Arabic errors for: model busy, daily free quota used up, relay misconfigured, network failure.
 
 ## Relay API (Cloudflare Worker)
