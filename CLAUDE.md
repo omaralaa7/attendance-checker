@@ -9,7 +9,9 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
 - **Static site on GitHub Pages** (`https://omaralaa7.github.io/attendance-checker/`). No build step.
   - `index.html`: Arabic RTL UI. Loads ExcelJS 4.4.0 from cdnjs and `app.js` as a module.
   - `app.js`: UI, photo prep (EXIF rotate, long side ≤ 1568 px, JPEG), calls the relay, save/download.
-  - `core.js`: pure logic shared with tests: roster parsing, writing the date column, prompt, JSON parsing.
+  - `core.js`: pure logic shared with tests: roster parsing, writing the date column, layout fitting, prompt, JSON parsing.
+  - `pdf.js`: one-lecture PDF report. Pages are drawn on a canvas (correct Arabic shaping), then placed into
+    jsPDF 2.5.1 (cdnjs, loaded on first click) as JPEG images, A4 at 150 dpi.
   - The working workbook is kept in the doctor's browser (localStorage `ghiab_wb`, previous copy in `ghiab_wb_prev`).
 - **Cloudflare Worker relay** (`worker/worker.js`, deployed as `attendance-relay.omaralaa20042004.workers.dev`).
   Holds `GEMINI_API_KEY` as a secret and only accepts requests from `ALLOWED_ORIGINS` (plus localhost).
@@ -33,6 +35,6 @@ marks the official Excel roster: **✓ present, ✗ absent**, in a new column he
 - `expected_output_2026-10-11.xlsx`: what the finished Excel should look like.
 
 ## Conventions
-- On every release bump the `?v=` number in `index.html` (for app.js) and at the top of `app.js` (for core.js).
+- On every release bump the `?v=` number in `index.html` (app.js), in `app.js` (core.js, pdf.js) and in `pdf.js` (core.js).
   GitHub Pages lets browsers cache files for 10 minutes; without the bump the doctor can run stale code.
 - Commits are under the user's name only: no Claude co-author trailer.

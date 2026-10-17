@@ -1,5 +1,6 @@
 // Bump ?v= here and in index.html on every release so browsers never run a cached old copy.
-import * as core from "./core.js?v=2";
+import * as core from "./core.js?v=3";
+import { buildPdf } from "./pdf.js?v=3";
 
 // The Cloudflare Worker that holds the Gemini key. When the page is served from localhost
 // (development only) it can be pointed elsewhere with ?relay=http://127.0.0.1:8787
@@ -78,6 +79,7 @@ function render() {
   $("extra").hidden = !extraNames.length;
   if (extraNames.length) $("extra").innerHTML = `<strong>أسماء مكتوبة في الورقة ومش لاقيها في الكشف:</strong> ${extraNames.map(esc).join("، ")}`;
   $("save").disabled = !(P + A);
+  $("pdf").disabled = !(P + A);
 }
 
 $("filters").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; filter = b.dataset.f; render(); };
@@ -221,6 +223,24 @@ $("save").onclick = async () => {
     setStatus(saved ? "اتحفظ الملف ونزل عندك. كل محاضرة بتتضاف كعمود جديد في نفس الملف."
                     : "الملف نزل عندك، بس المتصفح مقدرش يحتفظ بنسخة. المرة الجاية ارفع الملف اللي نزل ده.", !saved);
   } catch (e) { setStatus("الملف ماتحفظش: " + (e.message || e), true); }
+  finally { render(); }
+};
+
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+$("pdf").onclick = async () => {
+  const btn = $("pdf"); btn.disabled = true;
+  setStatus("بيجهّز ملف الـ PDF…");
+  try {
+    const blob = await buildPdf({ title: roster.title, iso: curKey, students: roster.students, marks, flags });
+    download(blob, `الحضور ${core.fmtDate(curKey).replace(/\//g, "-")}.pdf`);
+    setStatus(dirty ? "الـ PDF نزل عندك. متنساش تدوس \"حفظ ملف الإكسل\" كمان علشان العلامات تتسجل في الملف."
+                    : "الـ PDF نزل عندك.");
+  } catch (e) { setStatus("الـ PDF ماتعملش: " + (e.message || e), true); }
   finally { render(); }
 };
 

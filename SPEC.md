@@ -17,7 +17,8 @@ only the images + roster names leave the browser (to Gemini, via the relay).
    written on paper. Names read from paper that matched nobody are listed in a yellow box above the list.
    Picking a date that already has a column loads its marks for editing.
 4. **Sticky bottom bar**: "✓ N حاضر · ✗ M غايب" and "حفظ ملف الإكسل" → writes the column into the working workbook
-   and downloads `الغياب <d-m-yyyy>.xlsx`. The previous version is kept as a backup in localStorage.
+   and downloads `الغياب <d-m-yyyy>.xlsx`. "تحميل PDF" downloads `الحضور <d-m-yyyy>.pdf`: a report of the current lecture
+   (title, date, counts, serial / name / ✓✗ table, yellow for flagged rows, page numbers) of whatever is on screen. The previous version is kept as a backup in localStorage.
 
 ## Excel rules
 - Find the header row by the cell containing "اسم الطالب"; serial column is the header "م".
